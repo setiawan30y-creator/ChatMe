@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Kode OTP (disimpan dalam bentuk hash).
+ * @2026-Alifiandra
+ */
+class PhoneVerification extends Model
+{
+    protected $fillable = ['phone', 'code_hash', 'attempts', 'ip_address', 'expires_at', 'consumed_at'];
+
+    protected $hidden = ['code_hash'];
+
+    protected function casts(): array
+    {
+        return [
+            'expires_at' => 'datetime',
+            'consumed_at' => 'datetime',
+        ];
+    }
+}
