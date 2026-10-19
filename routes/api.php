@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\MessageController;
+use App\Http\Controllers\Api\V1\StatusController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -60,5 +61,15 @@ Route::prefix('v1')->group(function () {
         Route::get('attachments/{attachment}', [MessageController::class, 'attachment']);
 
         Route::get('sync', [MessageController::class, 'sync']);
+
+        // Status 24 jam
+        Route::get('statuses', [StatusController::class, 'index']);
+        Route::post('statuses', [StatusController::class, 'store'])->middleware('throttle:send');
+        Route::delete('statuses/{status}', [StatusController::class, 'destroy']);
+        Route::post('statuses/{status}/view', [StatusController::class, 'view']);
+        Route::get('statuses/{status}/viewers', [StatusController::class, 'viewers']);
+        Route::get('statuses/{status}/media', [StatusController::class, 'media']);
+        Route::post('statuses/{status}/reply', [StatusController::class, 'reply'])->middleware('throttle:send');
+        Route::post('status-mutes/{user}', [StatusController::class, 'mute']);
     });
 });

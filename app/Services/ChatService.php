@@ -86,7 +86,7 @@ class ChatService
 
         $message = DB::transaction(function () use ($conversation, $sender, $data, $files, $clientUuid) {
             $type = 'text';
-            $meta = [];
+            $meta = $data['meta'] ?? [];
             if ($files) {
                 $first = $files[0];
                 $mime = (string) $first->getMimeType();

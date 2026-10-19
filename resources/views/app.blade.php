@@ -3,7 +3,7 @@
     $chatme = [
         'name' => config('chatme.name'),
         'signature' => config('chatme.signature'),
-        'version' => '1.0.0',
+        'version' => '1.1.0',
         'maxUploadMb' => round(config('chatme.uploads.max_kb') / 1024),
         'editWindowMinutes' => \App\Models\Message::EDIT_WINDOW_MINUTES,
         'realtime' => config('broadcasting.default') === 'reverb' ? [

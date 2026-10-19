@@ -26,6 +26,9 @@ class User extends Authenticatable
         'read_receipts' => true,
         'theme' => 'system',         // system | light | dark
         'enter_to_send' => true,
+        'status_privacy' => 'contacts', // contacts | except | only
+        'status_list' => [],            // id pengguna untuk mode except / only
+        'status_muted' => [],           // id pengguna yang statusnya dibisukan
     ];
 
     protected $fillable = ['phone', 'name', 'about', 'avatar_path', 'locale', 'settings', 'phone_verified_at', 'last_seen_at'];

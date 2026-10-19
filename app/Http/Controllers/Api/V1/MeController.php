@@ -38,7 +38,18 @@ class MeController extends Controller
             'settings.read_receipts' => ['sometimes', 'boolean'],
             'settings.theme' => ['sometimes', 'in:system,light,dark'],
             'settings.enter_to_send' => ['sometimes', 'boolean'],
+            'settings.status_privacy' => ['sometimes', 'in:contacts,except,only'],
+            'settings.status_list' => ['sometimes', 'array', 'max:1000'],
+            'settings.status_list.*' => ['integer'],
+            'settings.status_muted' => ['sometimes', 'array', 'max:1000'],
+            'settings.status_muted.*' => ['integer'],
         ]);
+
+        foreach (['status_list', 'status_muted'] as $k) {
+            if (isset($data['settings'][$k])) {
+                $data['settings'][$k] = array_values(array_unique(array_map('intval', $data['settings'][$k])));
+            }
+        }
 
         if (isset($data['settings'])) {
             $data['settings'] = array_intersect_key(array_merge($user->allSettings(), $data['settings']), User::DEFAULT_SETTINGS);

@@ -11,6 +11,7 @@ Platform komunikasi pribadi & bisnis — **satu akun, banyak perangkat**. PWA ya
 | Akun | Login/daftar dengan nomor HP + OTP (masa berlaku, batas percobaan, jeda kirim ulang, rate limit), profil, foto, info |
 | Chat | Chat pribadi & grup, kirim teks/foto/video/dokumen/pesan suara, balas, reaksi emoji, edit (15 menit), hapus untuk semua, cari pesan, format `*tebal*` `_miring_` `~coret~`, tautan otomatis |
 | Status | Terkirim ✓ · diterima ✓✓ · dibaca ✓✓ (emas), indikator *sedang mengetik*, online / terakhir dilihat |
+| Status 24 jam | Status teks (8 warna latar, 4 gaya huruf), foto & video dengan keterangan; cincin tersegmen (emas = belum dilihat); penampil layar penuh dengan progres, ketuk kiri/kanan, tahan untuk jeda, panah keyboard; daftar "dilihat oleh" real-time; balas status → masuk ke chat pribadi dengan kutipan; bisukan status orang tertentu; privasi *Kontak saya / Kecuali… / Hanya…*; terhapus otomatis setelah 24 jam (file ikut dihapus) |
 | Grup | Admin & pemilik, tambah/keluarkan anggota, jadikan admin, ganti nama/deskripsi/foto, mode "hanya admin yang kirim", pesan sistem |
 | Perangkat tertaut | Tautkan perangkat baru lewat **QR** atau **kode**, daftar perangkat, ganti nama, **putuskan dari jarak jauh** (langsung keluar), batas jumlah perangkat |
 | Notifikasi | Mode Normal / Hanya suara / Privat / Senyap, pratinjau on/off, bisukan per chat, badge ikon aplikasi |
@@ -18,6 +19,8 @@ Platform komunikasi pribadi & bisnis — **satu akun, banyak perangkat**. PWA ya
 | Real-time | Laravel Reverb. Jika Reverb mati, aplikasi otomatis beralih ke sinkronisasi berkala — pesan tetap sampai |
 | API | REST `/api/v1` — PWA memakai sesi (cookie), aplikasi Flutter nanti memakai Bearer token (`mode=token`) |
 | Keamanan | Semua akses dicek di server (anggota percakapan), lampiran privat, idempotensi pengiriman (`client_uuid`), pencarian nomor hanya pencocokan penuh |
+
+**Siapa yang termasuk "kontak" untuk Status?** Orang yang pernah Anda kirimi pesan di chat pribadi. Orang asing yang hanya mengirim pesan ke Anda tidak otomatis melihat status Anda. Pengaturan privasi berlaku untuk status yang dipasang berikutnya.
 
 Belum termasuk (fase berikutnya sesuai blueprint): Private Space/Dual Security, multi-company workspace, Business Inbox, terjemahan, Web Push saat aplikasi tertutup, panggilan suara/video, WhatsApp Gateway.
 
@@ -54,6 +57,17 @@ php artisan reverb:start
 ```
 
 Tanpa Reverb aplikasi tetap berfungsi (sinkronisasi berkala tiap beberapa detik), tetapi dengan Reverb pesan, status dibaca, dan indikator mengetik tampil seketika.
+
+### Pembersihan status otomatis
+
+Status yang lewat 24 jam sudah tidak bisa dilihat. Untuk menghapus data dan file-nya dari server, jalankan scheduler (jendela PowerShell ketiga):
+
+```powershell
+cd C:\laragon\www\ChatMe
+php artisan schedule:work
+```
+
+Atau jalankan manual kapan saja: `php artisan chatme:prune-statuses`. Status kedaluwarsa juga ikut dibersihkan setiap ada status baru dipasang.
 
 ### Agar bisa di-install sebagai aplikasi (PWA)
 
@@ -105,7 +119,7 @@ Aplikasi mengirim `POST` JSON `{ "phone": "62812...", "message": "...", "code": 
 php artisan test
 ```
 
-Mencakup OTP (salah/kedaluwarsa/dipakai ulang/batas percobaan), login sesi & token, pencabutan perangkat, isolasi akses percakapan & lampiran, idempotensi pesan, siklus grup & kebijakan kirim, penautan perangkat (QR/kode, sekali pakai), dan batas perangkat.
+Mencakup status (privasi kontak/kecuali/hanya, orang asing tidak melihat, file privat, kedaluwarsa 24 jam, balasan, bisukan), OTP (salah/kedaluwarsa/dipakai ulang/batas percobaan), login sesi & token, pencabutan perangkat, isolasi akses percakapan & lampiran, idempotensi pesan, siklus grup & kebijakan kirim, penautan perangkat (QR/kode, sekali pakai), dan batas perangkat.
 
 ## Struktur penting
 

@@ -88,6 +88,10 @@ const ICONS = {
   phone: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
   wifiOff: '<path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5-2.7M14.5 10.4A10 10 0 0 1 19 13M2 9.5a15 15 0 0 1 4.5-2.8M11 6a15 15 0 0 1 11 3.5"/><path d="M12 20h.01" stroke-width="2.6"/>',
   sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
+  status: '<circle cx="12" cy="12" r="9" stroke-dasharray="3.2 2.6"/><circle cx="12" cy="12" r="4.2"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.7-1 1.2-1.9-.5-1 0-2.1 1.3-2.1H17a4 4 0 0 0 4-4C21 7.5 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.1"/><circle cx="10.5" cy="7.3" r="1.1"/><circle cx="15.2" cy="7.6" r="1.1"/>',
+  type: '<path d="M4 18 8.5 6 13 18M5.6 14h5.8M15.5 18v-5.2a2.8 2.8 0 0 1 5.5 0V18M15.5 15.4H21"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
   star: '<path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.8L12 3.5Z"/>',
 };
 const icon = (name, cls = '') => raw(`<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`);
@@ -204,6 +208,8 @@ const S = {
   rt: 'off',                // status koneksi real-time
   installPrompt: null,
   outbox: [],
+  view: 'chats',            // chats | status
+  statusFeed: null,
 };
 const myId = () => S.me?.id;
 const activeConv = () => S.convs.get(S.activeId);
@@ -513,6 +519,7 @@ async function startApp(offline = false) {
   if (cached && !S.convs.size) { cached.forEach((c) => S.convs.set(c.id, c)); renderList(); }
   if (!offline) {
     await loadConversations();
+    loadStatuses();
     connectRealtime();
     flushOutbox();
   }
@@ -529,6 +536,7 @@ function renderShell() {
     <nav class="rail" aria-label="Navigasi">
       <img class="logo" src="/icons/icon-192.png" alt="${CFG.name}">
       <button class="icon-btn active" data-action="filter" data-filter="all" title="Chat">${icon('chat')}<span class="badge" id="rail-badge" hidden></span></button>
+      <button class="icon-btn" data-action="view" data-view="status" id="rail-status" title="Status">${icon('status')}<span class="status-dot" id="rail-status-dot" hidden></span></button>
       <button class="icon-btn" data-action="filter" data-filter="groups" title="Grup">${icon('users')}</button>
       <button class="icon-btn" data-action="filter" data-filter="archived" title="Arsip">${icon('archive')}</button>
       <span class="spacer"></span>
@@ -538,22 +546,39 @@ function renderShell() {
     </nav>
     <aside class="sidebar">
       <header class="side-head">
-        <h1>Chat</h1>
-        <button class="icon-btn" data-action="new-group" title="Grup baru">${icon('users')}</button>
-        <button class="icon-btn" data-action="new-chat" title="Chat baru">${icon('edit')}</button>
+        <div class="side-tabs" role="tablist">
+          <button role="tab" data-action="view" data-view="chats">Chat</button>
+          <button role="tab" data-action="view" data-view="status">Status<span class="status-dot" id="tab-status-dot" hidden></span></button>
+        </div>
+        <span class="side-actions" data-for="chats">
+          <button class="icon-btn" data-action="new-group" title="Grup baru">${icon('users')}</button>
+          <button class="icon-btn" data-action="new-chat" title="Chat baru">${icon('edit')}</button>
+        </span>
+        <span class="side-actions" data-for="status">
+          <button class="icon-btn" data-action="status-text" title="Status teks">${icon('type')}</button>
+          <button class="icon-btn" data-action="status-media" title="Status foto/video">${icon('camera')}</button>
+          <button class="icon-btn" data-action="status-privacy" title="Privasi status">${icon('lock')}</button>
+        </span>
         <button class="icon-btn mobile-only" data-action="settings" title="Pengaturan">${icon('settings')}</button>
       </header>
-      <div class="search">${icon('search', 'i-sm')}<input id="conv-search" type="search" placeholder="Cari chat" autocomplete="off"></div>
-      <div class="filters" role="tablist">
-        ${[['all', 'Semua'], ['unread', 'Belum dibaca'], ['groups', 'Grup'], ['archived', 'Arsip']].map(([k, l]) => html`<button class="chip ${S.filter === k ? 'on' : ''}" data-action="filter" data-filter="${k}" role="tab">${l}</button>`)}
+      <div data-for="chats">
+        <div class="search">${icon('search', 'i-sm')}<input id="conv-search" type="search" placeholder="Cari chat" autocomplete="off"></div>
+        <div class="filters" role="tablist">
+          ${[['all', 'Semua'], ['unread', 'Belum dibaca'], ['groups', 'Grup'], ['archived', 'Arsip']].map(([k, l]) => html`<button class="chip ${S.filter === k ? 'on' : ''}" data-action="filter" data-filter="${k}" role="tab">${l}</button>`)}
+        </div>
       </div>
       <div id="banners"></div>
       <div class="conv-list" id="conv-list"><div class="spinner"></div></div>
-      <button class="fab" data-action="new-chat" aria-label="Chat baru">${icon('edit')}</button>
+      <input type="file" id="status-file" accept="image/*,video/*" hidden>
+      <button class="fab" data-action="new-chat" data-for="chats" aria-label="Chat baru">${icon('edit')}</button>
+      <button class="fab fab-2" data-action="status-text" data-for="status" aria-label="Status teks">${icon('type')}</button>
+      <button class="fab" data-action="status-media" data-for="status" aria-label="Status foto/video">${icon('camera')}</button>
     </aside>
     <section class="pane" id="pane"></section>
   </div>`);
   $('#conv-search').addEventListener('input', debounce((e) => { S.query = e.target.value.trim().toLowerCase(); renderList(); }, 120));
+  $('#status-file').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) openStatusMediaComposer(f); };
+  applyView();
   renderPane();
   renderBanners();
 }
@@ -596,6 +621,7 @@ function sortedConvs() {
 
 function renderList() {
   const el = $('#conv-list'); if (!el) return;
+  if (S.view === 'status') { updateAppBadge(); return renderStatusList(); }
   let list = sortedConvs();
   if (S.filter === 'archived') list = list.filter((c) => c.archived);
   else {
@@ -850,6 +876,7 @@ function renderBubble(m, conv, first, last) {
     <div class="bubble ${deleted ? 'deleted' : ''}" data-action="msg-menu" data-ctx="1">
       ${!mine && conv.type === 'group' && first ? html`<div class="sender" style="--sc:${senderColor}">${m.sender?.name}</div>` : ''}
       ${m.reply_to && !deleted ? html`<div class="quote" data-action="jump" data-target="${m.reply_to.id}"><b>${m.reply_to.sender_name || ''}</b><span>${m.reply_to.preview}</span></div>` : ''}
+      ${m.meta?.status_reply && !deleted ? statusQuote(m.meta.status_reply) : ''}
       ${media}
       ${audio && !deleted ? voicePlayer(m, audio) : ''}
       ${!deleted ? files.map((a) => html`<a class="file-card" href="${a.url}?download=1" target="_blank" rel="noopener" download="${a.name}"><span class="ext">${(a.name.split('.').pop() || 'file').slice(0, 4)}</span><span><div class="fname">${a.name}</div><div class="fsize">${fmtSize(a.size)}</div></span>${icon('download', 'i-sm')}</a>`) : ''}
@@ -1675,6 +1702,453 @@ function openApproveLink() {
 }
 
 /* =========================================================
+   STATUS 24 JAM
+   ========================================================= */
+const STATUS_COLORS = ['#4A2D6E', '#2F7D6D', '#A23E5C', '#3E6AA8', '#9A5B2E', '#7C6A1E', '#1F1A2E', '#C2622F'];
+const STATUS_FONTS = ['sans', 'serif', 'mono', 'script'];
+const STATUS_FONT_LABEL = { sans: 'Modern', serif: 'Klasik', mono: 'Mesin tik', script: 'Tulisan tangan' };
+const STATUS_DURATION = 5500;
+
+function setView(v) {
+  S.view = v === 'status' ? 'status' : 'chats';
+  applyView();
+  if (S.view === 'status') { if (isMobile() && S.activeId) closeChat(); loadStatuses(); }
+  renderList();
+}
+function applyView() {
+  const side = $('.sidebar'); if (!side) return;
+  side.dataset.view = S.view;
+  $$('.side-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === S.view));
+  $('#rail-status')?.classList.toggle('active', S.view === 'status');
+  if (S.view === 'status') $$('.rail [data-action="filter"]').forEach((b) => b.classList.remove('active'));
+}
+
+async function loadStatuses() {
+  try {
+    S.statusFeed = await api('GET', '/statuses');
+    updateStatusDot();
+    if (S.view === 'status') renderStatusList();
+  } catch (e) { if (S.view === 'status' && !S.statusFeed) $('#conv-list').innerHTML = val(html`<div class="empty">${icon('alert')}<b>Status tidak dapat dimuat</b>${e.message}</div>`); }
+}
+const reloadStatuses = debounce(loadStatuses, 400);
+
+function updateStatusDot() {
+  const has = !!S.statusFeed?.contacts?.some((g) => !g.all_viewed && !g.muted);
+  ['#rail-status-dot', '#tab-status-dot'].forEach((id) => { const d = $(id); if (d) d.hidden = !has; });
+}
+
+/** Cincin tersegmen: satu segmen per status, emas = belum dilihat. */
+function statusRing(items, size = 52) {
+  const n = Math.max(1, items.length), r = size / 2 - 2, c = 2 * Math.PI * r;
+  const gap = n > 1 ? Math.min(6, c / n / 4) : 0, seg = c / n - gap;
+  return raw(`<svg class="st-ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">${items.map((s, i) =>
+    `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke-width="2.6" stroke-linecap="round" stroke="${s.viewed ? 'var(--faint)' : 'var(--gold-bright)'}" stroke-dasharray="${seg} ${c - seg}" stroke-dashoffset="${-(i * (seg + gap)) + c / 4}"/>`).join('')}</svg>`);
+}
+
+function renderStatusList() {
+  const el = $('#conv-list'); if (!el) return;
+  const feed = S.statusFeed;
+  if (!feed) { el.innerHTML = val(html`<div class="spinner"></div>`); return; }
+  const mine = feed.mine || [];
+  const groups = feed.contacts || [];
+  const fresh = groups.filter((g) => !g.all_viewed && !g.muted);
+  const seen = groups.filter((g) => g.all_viewed && !g.muted);
+  const muted = groups.filter((g) => g.muted);
+  const row = (g) => html`
+    <button class="conv st-row" data-action="status-open" data-uid="${g.user.id}">
+      <span class="st-avatar">${statusRing(g.statuses)}${avatar(g.user.name, g.user.avatar_url, g.user.id)}</span>
+      <span class="conv-body"><span class="conv-top"><span class="conv-title">${g.user.name}</span></span>
+      <span class="conv-bottom"><span class="conv-preview">${fmtListTime(g.last_at)}${g.statuses.length > 1 ? ` · ${g.statuses.length} status` : ''}</span></span></span>
+    </button>`;
+  const privacyLabel = { contacts: 'Kontak saya', except: 'Kontak saya, kecuali…', only: 'Hanya dibagikan dengan…' }[feed.privacy?.mode || 'contacts'];
+  el.innerHTML = val(html`
+    <div class="st-mine">
+      <button class="conv st-row" data-action="${mine.length ? 'status-open' : 'status-media'}" data-uid="me">
+        <span class="st-avatar">${mine.length ? statusRing(mine.map(() => ({ viewed: true }))) : ''}${avatar(S.me.name, S.me.avatar_url, S.me.id)}${!mine.length ? html`<span class="st-plus">${icon('plus', 'i-xs')}</span>` : ''}</span>
+        <span class="conv-body"><span class="conv-top"><span class="conv-title">Status saya</span></span>
+        <span class="conv-bottom"><span class="conv-preview">${mine.length ? `${mine.length} status · ${fmtListTime(mine[mine.length - 1].created_at)} · ${mine.reduce((n, s) => n + (s.view_count || 0), 0)} dilihat` : 'Bagikan foto, video, atau teks selama 24 jam'}</span></span></span>
+      </button>
+      <div class="st-quick">
+        <button class="chip" data-action="status-text">${icon('type', 'i-xs')} Teks</button>
+        <button class="chip" data-action="status-media">${icon('camera', 'i-xs')} Foto / video</button>
+        <button class="chip" data-action="status-privacy">${icon('lock', 'i-xs')} ${privacyLabel}</button>
+      </div>
+    </div>
+    ${fresh.length ? html`<p class="st-section">Terbaru</p>${fresh.map(row)}` : ''}
+    ${seen.length ? html`<p class="st-section">Sudah dilihat</p>${seen.map(row)}` : ''}
+    ${muted.length ? html`<details class="st-muted"><summary class="st-section">Dibisukan (${muted.length})</summary>${muted.map(row)}</details>` : ''}
+    ${!groups.length ? html`<div class="empty">${icon('status')}<b>Belum ada status dari kontak</b>Status dari orang yang pernah Anda kirimi pesan akan muncul di sini selama 24 jam.</div>` : ''}`);
+}
+
+/* ---------- Pembuat status teks ---------- */
+function stLayer(cls) {
+  const el = document.createElement('div');
+  el.className = 'overlay st-layer ' + cls;
+  el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+  document.body.append(el);
+  if (isMobile()) history.pushState({ layer: 1 }, '', location.href);
+  return el;
+}
+
+function openStatusTextComposer() {
+  let ci = 0, fi = 0;
+  const ov = stLayer('st-compose');
+  ov.innerHTML = val(html`
+    <div class="st-bar">
+      <button class="icon-btn" data-st="close" aria-label="Tutup">${icon('x')}</button>
+      <span style="flex:1"></span>
+      <button class="icon-btn" data-st="font" title="Ganti gaya huruf">${icon('type')}</button>
+      <button class="icon-btn" data-st="color" title="Ganti warna latar">${icon('palette')}</button>
+    </div>
+    <div class="st-canvas"><textarea id="st-text" maxlength="700" rows="3" placeholder="Ketik status"></textarea></div>
+    <div class="st-foot">
+      <span class="st-font-name" id="st-font-name"></span>
+      <button class="send-btn ready" data-st="send" aria-label="Kirim status">${icon('send')}</button>
+    </div>`);
+  const ta = $('#st-text', ov);
+  const paint = () => {
+    ov.style.setProperty('--st-bg', STATUS_COLORS[ci]);
+    ov.dataset.font = STATUS_FONTS[fi];
+    $('#st-font-name', ov).textContent = STATUS_FONT_LABEL[STATUS_FONTS[fi]];
+    const len = ta.value.length; ta.style.fontSize = (len > 200 ? 20 : len > 90 ? 26 : 34) + 'px';
+    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, innerHeight * 0.6) + 'px';
+  };
+  ta.addEventListener('input', paint); paint(); setTimeout(() => ta.focus(), 50);
+  ov.close = () => { ov.remove(); };
+  ov.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-st]'); if (!b) return;
+    if (b.dataset.st === 'close') ov.close();
+    if (b.dataset.st === 'color') { ci = (ci + 1) % STATUS_COLORS.length; paint(); }
+    if (b.dataset.st === 'font') { fi = (fi + 1) % STATUS_FONTS.length; paint(); }
+    if (b.dataset.st === 'send') {
+      const body = ta.value.trim(); if (!body) return ta.focus();
+      b.disabled = true;
+      try {
+        const r = await api('POST', '/statuses', { type: 'text', body, color: STATUS_COLORS[ci], font: STATUS_FONTS[fi] });
+        ov.close(); afterStatusPosted(r);
+      } catch (err) { toast(err.message, { error: true }); b.disabled = false; }
+    }
+  });
+}
+
+/* ---------- Pembuat status foto / video ---------- */
+function openStatusMediaComposer(file) {
+  const isVideo = file.type.startsWith('video/');
+  if (!isVideo && !file.type.startsWith('image/')) return toast('Status hanya mendukung foto atau video.', { error: true });
+  if (file.size > (CFG.maxUploadMb || 20) * 1048576) return toast(`Ukuran file maksimal ${CFG.maxUploadMb} MB.`, { error: true });
+  const url = URL.createObjectURL(file);
+  const ov = stLayer('st-compose st-media');
+  ov.innerHTML = val(html`
+    <div class="st-bar"><button class="icon-btn" data-st="close" aria-label="Tutup">${icon('x')}</button></div>
+    <div class="st-canvas">${isVideo ? html`<video src="${url}" controls playsinline autoplay muted></video>` : html`<img src="${url}" alt="">`}</div>
+    <div class="st-foot st-caption">
+      <input id="st-cap" maxlength="700" placeholder="Tambahkan keterangan…" autocomplete="off">
+      <button class="send-btn ready" data-st="send" aria-label="Kirim status">${icon('send')}</button>
+    </div>`);
+  ov.close = () => { URL.revokeObjectURL(url); ov.remove(); };
+  if (isVideo) {
+    const v = $('video', ov);
+    v.onloadedmetadata = () => { if (v.duration > 90) toast('Video lebih dari 90 detik. Sebaiknya potong agar ringan dikirim.'); };
+  }
+  $('#st-cap', ov).addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-st="send"]', ov).click(); });
+  ov.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-st]'); if (!b) return;
+    if (b.dataset.st === 'close') ov.close();
+    if (b.dataset.st === 'send') {
+      b.disabled = true; b.innerHTML = val(html`<span class="spinner" style="width:18px;height:18px;margin:0;border-width:2px"></span>`);
+      const fd = new FormData();
+      fd.append('type', isVideo ? 'video' : 'image');
+      fd.append('file', file, file.name || (isVideo ? 'status.mp4' : 'status.jpg'));
+      const cap = $('#st-cap', ov).value.trim(); if (cap) fd.append('body', cap);
+      try { const r = await api('POST', '/statuses', fd); ov.close(); afterStatusPosted(r); }
+      catch (err) { toast(err.message, { error: true }); b.disabled = false; b.innerHTML = val(icon('send')); }
+    }
+  });
+}
+
+function afterStatusPosted(r) {
+  toast(r.recipients ? `Status dibagikan ke ${r.recipients} kontak.` : 'Status terpasang. Belum ada kontak yang bisa melihatnya — kirim pesan ke seseorang dulu.', { duration: 5000 });
+  if (S.view !== 'status') setView('status'); else loadStatuses();
+}
+
+/* ---------- Penampil status ---------- */
+let viewer = null;
+
+function statusGroupsForViewer() {
+  const f = S.statusFeed || {};
+  const groups = [];
+  if (f.mine?.length) groups.push({ key: 'me', user: { id: S.me.id, name: 'Status saya', avatar_url: S.me.avatar_url }, statuses: f.mine, mine: true });
+  const contacts = f.contacts || [];
+  [...contacts.filter((g) => !g.all_viewed && !g.muted), ...contacts.filter((g) => g.all_viewed && !g.muted), ...contacts.filter((g) => g.muted)]
+    .forEach((g) => groups.push({ key: g.user.id, user: g.user, statuses: g.statuses, mine: false, muted: g.muted }));
+  return groups;
+}
+
+function openStatusViewer(key, statusId = null) {
+  const groups = statusGroupsForViewer();
+  let gi = groups.findIndex((g) => g.key === key);
+  if (gi < 0) return toast('Status tidak tersedia lagi.');
+  const g = groups[gi];
+  let si = statusId ? Math.max(0, g.statuses.findIndex((s) => s.id === statusId)) : g.mine ? 0 : Math.max(0, g.statuses.findIndex((s) => !s.viewed));
+  closeStatusViewer();
+  const ov = stLayer('st-viewer');
+  viewer = { ov, groups, gi, si, timer: null, start: 0, elapsed: 0, paused: false, dur: STATUS_DURATION, video: null };
+  ov.close = closeStatusViewer;
+  ov.addEventListener('click', onViewerClick);
+  ov.addEventListener('pointerdown', onViewerPointerDown);
+  ov.addEventListener('pointerup', onViewerPointerUp);
+  ov.addEventListener('pointercancel', onViewerPointerUp);
+  drawStatus();
+}
+
+function closeStatusViewer() {
+  if (!viewer) return;
+  cancelAnimationFrame(viewer.timer);
+  viewer.video?.pause();
+  viewer.ov.remove();
+  viewer = null;
+  if (S.view === 'status') renderStatusList();
+  updateStatusDot();
+}
+
+function drawStatus() {
+  const v = viewer; if (!v) return;
+  const g = v.groups[v.gi], s = g.statuses[v.si];
+  cancelAnimationFrame(v.timer);
+  v.video = null; v.elapsed = 0; v.paused = false; v.dur = STATUS_DURATION;
+  const content = s.type === 'text'
+    ? html`<div class="st-text-card" style="--st-bg:${s.meta?.color || STATUS_COLORS[0]}" data-font="${s.meta?.font || 'sans'}"><p>${richText(s.body)}</p></div>`
+    : s.type === 'video'
+      ? html`<video src="${s.media_url}" playsinline autoplay ${g.mine ? '' : ''}></video>`
+      : html`<img src="${s.media_url}" alt="">`;
+  v.ov.innerHTML = val(html`
+    <div class="st-progress">${g.statuses.map((x, i) => html`<span><i style="width:${i < v.si ? 100 : 0}%"></i></span>`)}</div>
+    <div class="st-head">
+      <button class="icon-btn" data-sv="close" aria-label="Tutup">${icon('back')}</button>
+      ${avatar(g.mine ? S.me.name : g.user.name, g.user.avatar_url, g.user.id, 'sm')}
+      <span class="st-who"><b>${g.user.name}</b><small>${fmtListTime(s.created_at)}${fmtListTime(s.created_at).includes('.') ? '' : ' ' + fmtTime(s.created_at)}</small></span>
+      <button class="icon-btn" data-sv="pause" aria-label="Jeda">${icon('pause', 'i-sm')}</button>
+      <button class="icon-btn" data-sv="menu" aria-label="Menu">${icon('more')}</button>
+    </div>
+    <div class="st-stage">${content}${s.type !== 'text' && s.body ? html`<p class="st-caption-text">${richText(s.body)}</p>` : ''}</div>
+    <button class="st-nav prev" data-sv="prev" aria-label="Sebelumnya"></button>
+    <button class="st-nav next" data-sv="next" aria-label="Berikutnya"></button>
+    <div class="st-bottom">
+      ${g.mine
+        ? html`<button class="st-views" data-sv="viewers">${icon('eye', 'i-sm')} <span id="st-view-count">${s.view_count || 0}</span> dilihat</button>`
+        : html`<form class="st-reply" data-sv-form="1"><input id="st-reply-input" placeholder="Balas status…" maxlength="4000" autocomplete="off"><button class="send-btn ready" type="submit" aria-label="Kirim balasan">${icon('send')}</button></form>`}
+    </div>`);
+  const input = $('#st-reply-input', v.ov);
+  if (input) {
+    input.addEventListener('focus', () => pauseStatus(true));
+    input.addEventListener('blur', () => { if (!input.value) pauseStatus(false); });
+    $('.st-reply', v.ov).onsubmit = (e) => { e.preventDefault(); sendStatusReply(s, g, input); };
+  }
+  if (s.type === 'video') {
+    const vid = $('video', v.ov); v.video = vid;
+    vid.onloadedmetadata = () => { v.dur = Math.max(1000, (vid.duration || 5) * 1000); };
+    vid.onended = () => nextStatus();
+    vid.onerror = () => nextStatus();
+  } else if (s.type === 'image') {
+    const img = $('img', v.ov); v.paused = true;
+    const go = () => { v.paused = false; v.start = performance.now(); };
+    img.complete ? go() : (img.onload = go, img.onerror = () => { toast('Status tidak dapat dimuat.'); nextStatus(); });
+  }
+  if (!g.mine && !s.viewed) {
+    s.viewed = true;
+    api('POST', `/statuses/${s.id}/view`).catch(() => {});
+    const feedG = S.statusFeed?.contacts?.find((x) => x.user.id === g.user.id);
+    if (feedG) feedG.all_viewed = feedG.statuses.every((x) => x.viewed);
+  }
+  v.start = performance.now();
+  tickStatus();
+}
+
+function tickStatus() {
+  const v = viewer; if (!v) return;
+  const bar = $$('.st-progress i', v.ov)[v.si];
+  const step = () => {
+    if (!viewer || viewer !== v) return;
+    if (!v.paused) {
+      const p = v.video ? (v.video.currentTime * 1000) / v.dur : (v.elapsed + performance.now() - v.start) / v.dur;
+      if (bar) bar.style.width = Math.min(100, p * 100) + '%';
+      if (p >= 1 && !v.video) return nextStatus();
+    }
+    v.timer = requestAnimationFrame(step);
+  };
+  v.timer = requestAnimationFrame(step);
+}
+
+function pauseStatus(on) {
+  const v = viewer; if (!v || v.paused === on) return;
+  if (on) { v.elapsed += performance.now() - v.start; v.video?.pause(); }
+  else { v.start = performance.now(); v.video?.play().catch(() => {}); }
+  v.paused = on;
+  const b = $('[data-sv="pause"]', v.ov); if (b) b.innerHTML = val(icon(on ? 'play' : 'pause', 'i-sm'));
+}
+
+function nextStatus() {
+  const v = viewer; if (!v) return;
+  const g = v.groups[v.gi];
+  if (v.si < g.statuses.length - 1) { v.si++; return drawStatus(); }
+  if (v.gi < v.groups.length - 1 && !v.groups[v.gi + 1].mine) {
+    v.gi++; const ng = v.groups[v.gi];
+    v.si = Math.max(0, ng.statuses.findIndex((s) => !s.viewed)); return drawStatus();
+  }
+  closeStatusViewer();
+}
+function prevStatus() {
+  const v = viewer; if (!v) return;
+  if (v.si > 0) { v.si--; return drawStatus(); }
+  if (v.gi > 0 && !v.groups[v.gi - 1].mine) { v.gi--; v.si = v.groups[v.gi].statuses.length - 1; return drawStatus(); }
+  drawStatus();
+}
+
+let holdTimer = null, held = false;
+function onViewerPointerDown(e) {
+  if (e.target.closest('.st-head, .st-bottom')) return;
+  held = false;
+  holdTimer = setTimeout(() => { held = true; pauseStatus(true); }, 220);
+}
+function onViewerPointerUp() {
+  clearTimeout(holdTimer);
+  if (held) { setTimeout(() => { pauseStatus(false); held = false; }, 0); }
+}
+
+async function onViewerClick(e) {
+  const v = viewer; if (!v) return;
+  const b = e.target.closest('[data-sv]');
+  if (!b) return;
+  if (held && (b.dataset.sv === 'prev' || b.dataset.sv === 'next')) return;
+  const g = v.groups[v.gi], s = g.statuses[v.si];
+  switch (b.dataset.sv) {
+    case 'close': return closeStatusViewer();
+    case 'next': return nextStatus();
+    case 'prev': return prevStatus();
+    case 'pause': return pauseStatus(!v.paused);
+    case 'viewers': return showStatusViewers(s);
+    case 'menu': {
+      pauseStatus(true);
+      const r = b.getBoundingClientRect();
+      showMenu(r.right - 230, r.bottom + 4, g.mine
+        ? html`<button data-cmd="delete" class="danger">${icon('trash', 'i-sm')} Hapus status ini</button>`
+        : html`<button data-cmd="mute">${icon(g.muted ? 'bell' : 'bellOff', 'i-sm')} ${g.muted ? 'Bunyikan' : 'Bisukan'} status ${g.user.name}</button><button data-cmd="chat">${icon('chat', 'i-sm')} Kirim pesan</button>`,
+      async (cmd) => {
+        try {
+          if (cmd === 'delete') {
+            if (!(await confirmDialog('Hapus status?', 'Status ini akan dihapus untuk semua yang dapat melihatnya.', 'Hapus', true))) return pauseStatus(false);
+            await api('DELETE', `/statuses/${s.id}`);
+            g.statuses.splice(v.si, 1);
+            S.statusFeed.mine = g.statuses;
+            toast('Status dihapus.');
+            if (!g.statuses.length) return closeStatusViewer();
+            v.si = Math.min(v.si, g.statuses.length - 1); return drawStatus();
+          }
+          if (cmd === 'mute') {
+            S.me = (await api('POST', `/status-mutes/${g.user.id}`, { muted: !g.muted })).user;
+            toast(g.muted ? 'Status dibunyikan.' : `Status ${g.user.name} dibisukan.`);
+            closeStatusViewer(); return loadStatuses();
+          }
+          if (cmd === 'chat') {
+            const r2 = await api('POST', '/conversations', { type: 'direct', user_id: g.user.id });
+            S.convs.set(r2.conversation.id, r2.conversation);
+            closeStatusViewer(); setView('chats'); return openConversation(r2.conversation.id);
+          }
+        } catch (err) { toast(err.message, { error: true }); pauseStatus(false); }
+      });
+      setTimeout(() => {
+        const m = $('.menu'); if (!m) return;
+        const obs = new MutationObserver(() => { if (!document.body.contains(m)) { obs.disconnect(); if (viewer && !$('.overlay.center')) pauseStatus(false); } });
+        obs.observe(document.body, { childList: true });
+      }, 0);
+    }
+  }
+}
+
+async function sendStatusReply(s, g, input) {
+  const body = input.value.trim(); if (!body) return;
+  input.disabled = true;
+  try {
+    const r = await api('POST', `/statuses/${s.id}/reply`, { body, client_uuid: uuid() });
+    input.value = ''; input.blur();
+    if (!S.convs.has(r.conversation_id)) await loadConversations();
+    upsertMessage(r.message, { silent: true });
+    toast(`Balasan terkirim ke ${g.user.name}.`, { action: 'Buka chat', onAction: () => { closeStatusViewer(); setView('chats'); openConversation(r.conversation_id); } });
+    pauseStatus(false);
+  } catch (err) { toast(err.message, { error: true }); }
+  finally { input.disabled = false; }
+}
+
+async function showStatusViewers(s) {
+  pauseStatus(true);
+  const ov = layer('modal', 'Dilihat oleh', html`<div id="st-viewers"><div class="spinner"></div></div>`, '', { onClose: () => pauseStatus(false) });
+  try {
+    const r = await api('GET', `/statuses/${s.id}/viewers`);
+    $('#st-viewers', ov).innerHTML = val(r.data.length
+      ? r.data.map((x) => html`<div class="list-item">${avatar(x.user?.name, x.user?.avatar_url, x.user?.id)}<span class="li-body"><div class="li-title">${x.user?.name}</div><div class="li-sub">${fmtListTime(x.viewed_at)} ${fmtTime(x.viewed_at)}</div></span></div>`)
+      : html`<p class="hint" style="text-align:center">Belum ada yang melihat status ini.</p>`);
+  } catch (e) { $('#st-viewers', ov).innerHTML = val(html`<p class="hint">${e.message}</p>`); }
+}
+function updateViewerCount(statusId, count) {
+  const v = viewer; if (!v) return;
+  const s = v.groups[v.gi].statuses[v.si];
+  if (s.id === statusId) { s.view_count = count; const el = $('#st-view-count'); if (el) el.textContent = count; }
+}
+
+/* ---------- Kutipan status di chat ---------- */
+function statusQuote(r) {
+  const mine = r.owner_id === myId();
+  return html`<div class="quote st-quote" data-action="status-reply-open" data-sid="${r.status_id}" data-owner="${r.owner_id}">
+    <span><b>${mine ? 'Status Anda' : 'Status · ' + r.owner_name}</b><span>${r.preview}</span></span>
+    ${r.thumb ? html`<img src="${r.thumb}" alt="" onerror="this.remove()">` : r.type === 'text' ? html`<i class="st-swatch" style="background:${r.color || STATUS_COLORS[0]}"></i>` : ''}
+  </div>`;
+}
+async function openStatusFromReply(statusId, ownerId) {
+  if (!S.statusFeed) await loadStatuses();
+  const key = ownerId === myId() ? 'me' : ownerId;
+  const g = statusGroupsForViewer().find((x) => x.key === key);
+  if (!g || !g.statuses.some((s) => s.id === statusId)) return toast('Status ini sudah tidak tersedia (lebih dari 24 jam atau dihapus).');
+  openStatusViewer(key, statusId);
+}
+
+/* ---------- Privasi status ---------- */
+function openStatusPrivacy() {
+  const s = S.me.settings || {};
+  let mode = s.status_privacy || 'contacts';
+  const picked = new Set((s.status_list || []).map(Number));
+  const contacts = new Map();
+  S.convs.forEach((c) => { if (c.type === 'direct' && c.peer) contacts.set(c.peer.id, c.peer); });
+  const ov = drawer('Privasi status', html`
+    <p class="hint" style="margin-top:0">Siapa yang dapat melihat status yang Anda pasang berikutnya? Status yang sudah terpasang tidak berubah.</p>
+    <div class="mode-cards">
+      ${[['contacts', 'Kontak saya', 'Semua orang yang pernah Anda kirimi pesan.'], ['except', 'Kontak saya, kecuali…', 'Sembunyikan dari orang tertentu.'], ['only', 'Hanya bagikan dengan…', 'Hanya orang yang Anda pilih.']]
+        .map(([k, t, d]) => html`<label class="mode-card"><input type="radio" name="stmode" value="${k}" ${mode === k ? 'checked' : ''}><span><b>${t}</b><small>${d}</small></span></label>`)}
+    </div>
+    <div id="st-pick" style="margin-top:16px"></div>`,
+  html`<button class="btn btn-ghost" data-close="1">Batal</button><button class="btn" id="st-priv-save">Simpan</button>`);
+  const drawPick = () => {
+    const box = $('#st-pick', ov);
+    if (mode === 'contacts') { box.innerHTML = ''; return; }
+    box.innerHTML = val(html`
+      <p class="section-title">${mode === 'except' ? 'Sembunyikan status dari' : 'Bagikan status hanya dengan'} (${picked.size})</p>
+      ${contacts.size ? [...contacts.values()].map((u) => html`<button class="list-item" data-pick="${u.id}">${userRow(u, html`<span class="check ${picked.has(u.id) ? 'on' : ''}">${icon('check', 'i-xs')}</span>`)}</button>`)
+        : html`<p class="hint">Belum ada kontak. Kirim pesan ke seseorang terlebih dahulu.</p>`}`);
+  };
+  ov.querySelectorAll('input[name="stmode"]').forEach((r) => r.onchange = () => { mode = r.value; drawPick(); });
+  $('#st-pick', ov).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pick]'); if (!b) return;
+    const id = Number(b.dataset.pick); picked.has(id) ? picked.delete(id) : picked.add(id); drawPick();
+  });
+  $('#st-priv-save', ov).onclick = async () => {
+    if (mode === 'only' && !picked.size) return toast('Pilih minimal satu kontak.', { error: true });
+    if (await saveMe({ settings: { status_privacy: mode, status_list: [...picked] } })) {
+      toast('Privasi status disimpan.'); ov.close(); loadStatuses();
+    }
+  };
+  drawPick();
+}
+
+/* =========================================================
    REAL-TIME (Laravel Reverb via protokol Pusher)
    ========================================================= */
 let pusher = null, pollTimer = null, convRefreshTimer = null, syncing = false;
@@ -1802,6 +2276,15 @@ function onChatEvent({ type, payload }) {
     case 'device.revoked':
       if (S.device && payload.device_id === S.device.id) onSignedOut('Perangkat ini telah diputus dari akun Anda.');
       break;
+    case 'status.new':
+    case 'status.deleted':
+      reloadStatuses();
+      break;
+    case 'status.viewed': {
+      const mine = S.statusFeed?.mine?.find((x) => x.id === payload.status_id);
+      if (mine) { mine.view_count = payload.view_count; if (S.view === 'status') renderStatusList(); updateViewerCount(payload.status_id, payload.view_count); }
+      break;
+    }
     case 'device.linked': {
       const dl = $('#device-list'); if (dl) loadDevices(dl.closest('.overlay'));
       if (S.device && payload.device?.id === S.device.id) break;
@@ -1821,7 +2304,13 @@ document.addEventListener('visibilitychange', () => {
 const actions = {
   'auth-link': () => renderAuthLink(),
   open: (el) => { if (Number(el.dataset.id) === S.activeId && !isMobile()) return; openConversation(Number(el.dataset.id)); },
-  filter: (el) => { S.filter = el.dataset.filter; renderList(); if (isMobile() && S.activeId) closeChat(); },
+  filter: (el) => { S.filter = el.dataset.filter; if (S.view !== 'chats') setView('chats'); else renderList(); if (isMobile() && S.activeId) closeChat(); },
+  view: (el) => setView(el.dataset.view),
+  'status-text': () => openStatusTextComposer(),
+  'status-media': () => $('#status-file')?.click(),
+  'status-privacy': () => openStatusPrivacy(),
+  'status-open': (el) => openStatusViewer(el.dataset.uid === 'me' ? 'me' : Number(el.dataset.uid)),
+  'status-reply-open': (el) => openStatusFromReply(Number(el.dataset.sid), Number(el.dataset.owner)),
   'new-chat': () => openNewChat(),
   'new-group': () => openNewGroup(),
   settings: () => openSettings(),
@@ -1910,6 +2399,11 @@ document.addEventListener('touchstart', (e) => {
 ['touchend', 'touchmove', 'touchcancel'].forEach((ev) => document.addEventListener(ev, () => clearTimeout(pressTimer), { passive: true }));
 
 document.addEventListener('keydown', (e) => {
+  if (viewer && !e.target.closest('input, textarea') && !$('.overlay.center, .menu')) {
+    if (e.key === 'ArrowRight') return nextStatus();
+    if (e.key === 'ArrowLeft') return prevStatus();
+    if (e.key === ' ') { e.preventDefault(); return pauseStatus(!viewer.paused); }
+  }
   if (e.key === 'Escape') {
     if ($('.menu, .emoji-pop')) return closeMenu();
     const top = [...$$('.overlay, .lightbox')].pop();

@@ -4,7 +4,7 @@
  * Data API tidak pernah di-cache (privasi & konsistensi).
  * @2026-Alifiandra
  */
-const VERSION = 'chatme-v1.0.0';
+const VERSION = 'chatme-v1.1.0';
 const SHELL = ['/', '/offline', '/css/chatme.css', '/js/chatme.js', '/vendor/pusher.min.js', '/icons/icon-192.png', '/icons/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
